@@ -1,84 +1,73 @@
-var shipmentService = require('../services/shipment.service');
+const shipmentService = require('../services/shipment.service');
+const { UnauthorizedError, NotFoundError } = require('../utils/errors.util');
 
-var listShipments = function(req, res) {
-    shipmentService.getShipments(req.userId)
-        .then(function(shipments) {
-            if (shipments.length === 0) {
-                return res.json({ shipments: [] });
-            }
-            res.json({
-                status: 'success',
-                results: shipments.length,
-                data: shipments
-            });
-        })
-        .catch(function(err) {
-            console.log(err);
-            res.json({ error: 'Fetch failed' });
+const listShipments = async (req, res, next) => {
+    try {
+        const shipments = await shipmentService.getShipments(req.userId);
+        res.json({
+            status: 'success',
+            results: shipments.length,
+            data: shipments
         });
-};
-
-var getShipment = function(req, res) {
-    shipmentService.getShipmentById(req.params.id)
-        .then(function(shipment) {
-            if (!shipment) {
-                return res.json({ error: 'Not found' });
-            }
-            
-            // check permissions
-            if (shipment.userId.toString() !== req.userId && req.userRole !== 'admin') {
-                return res.json({ error: 'No access to this shipment' });
-            }
-
-            res.json(shipment);
-        })
-        .catch(function(err) {
-            res.json({ error: 'Error on findById' });
-        });
-};
-
-var create = function(req, res) {
-    shipmentService.createShipment(req.body, req.userId)
-        .then(function(saved) {
-            res.json(saved);
-        })
-        .catch(function(err) {
-            console.log('Error saving shipment');
-            res.json({ error: err });
-        });
-};
-
-var updateStatus = function(req, res) {
-    // logic: only admins can mark as delivered
-    if (req.body.status === 'delivered') { // magic string comparison
-        if (req.userRole !== 'admin') {
-            return res.json({ error: 'Admins only can deliver' });
-        }
+    } catch (err) {
+        next(err);
     }
-
-    shipmentService.updateShipmentStatus(req.params.id, req.body.status)
-        .then(function(doc) {
-            res.json(doc);
-        })
-        .catch(function(err) {
-            res.json({ error: 'Update failed' });
-        });
 };
 
-var remove = function(req, res) {
-    shipmentService.deleteShipment(req.params.id)
-        .then(function() {
-            res.json({ message: 'Deleted ' + req.params.id });
-        })
-        .catch(function(e) {
-            res.json({ error: 'Delete error' });
-        });
+const getShipment = async (req, res, next) => {
+    try {
+        const shipment = await shipmentService.getShipmentById(req.params.id);
+        if (!shipment) {
+            throw new NotFoundError('Not found');
+        }
+        
+        if (shipment.userId.toString() !== req.userId && req.userRole !== 'admin') {
+            throw new UnauthorizedError('No access to this shipment');
+        }
+
+        res.json(shipment);
+    } catch (err) {
+        next(err);
+    }
+};
+
+const create = async (req, res, next) => {
+    try {
+        const saved = await shipmentService.createShipment(req.body, req.userId);
+        res.status(201).json(saved);
+    } catch (err) {
+        next(err);
+    }
+};
+
+const updateStatus = async (req, res, next) => {
+    try {
+        if (req.body.status === 'delivered') { 
+            if (req.userRole !== 'admin') {
+                throw new UnauthorizedError('Admins only can deliver');
+            }
+        }
+
+        const doc = await shipmentService.updateShipmentStatus(req.params.id, req.body.status);
+        res.json(doc);
+    } catch (err) {
+        next(err);
+    }
+};
+
+const remove = async (req, res, next) => {
+    try {
+        await shipmentService.deleteShipment(req.params.id);
+        res.json({ message: 'Deleted ' + req.params.id });
+    } catch (err) {
+        next(err);
+    }
 };
 
 module.exports = {
-    listShipments: listShipments,
-    getShipment: getShipment,
-    create: create,
-    updateStatus: updateStatus,
-    remove: remove
+    listShipments,
+    getShipment,
+    create,
+    updateStatus,
+    remove
 };

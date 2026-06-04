@@ -1,47 +1,44 @@
-var User = require('../../models/User');
-var jwt = require('jsonwebtoken');
-var bcrypt = require('bcrypt');
-var JWT_SECRET = process.env.JWT_SECRET || 'secret123';
+const User = require('../../models/User');
+const jwt = require('jsonwebtoken');
+const bcrypt = require('bcrypt');
+const { UnauthorizedError, NotFoundError } = require('../utils/errors.util');
 
-var registerUser = function(userData) {
-    return bcrypt.hash(userData.password, 12)
-        .then(function(hash) {
-            userData.password = hash;
-            var newUser = new User(userData);
-            return newUser.save();
-        });
+const JWT_SECRET = process.env.JWT_SECRET || 'secret123';
+
+const registerUser = async (userData) => {
+    const hash = await bcrypt.hash(userData.password, 12);
+    userData.password = hash;
+    const newUser = new User(userData);
+    return await newUser.save();
 };
 
-var loginUser = function(email, password) {
-    return User.findOne({ email: email })
-        .then(function(user) {
-            if (!user) {
-                return { error: 'No user found with that email' };
-            }
-            return bcrypt.compare(password, user.password)
-                .then(function(isValid) {
-                    if (isValid) {
-                        var token = jwt.sign(
-                            { id: user._id, role: user.role }, 
-                            JWT_SECRET, 
-                            { expiresIn: '12h' }
-                        );
-                        return {
-                            token: token,
-                            user: {
-                                name: user.name,
-                                email: user.email,
-                                role: user.role
-                            }
-                        };
-                    } else {
-                        return { error: 'Password does not match' };
-                    }
-                });
-        });
+const loginUser = async (email, password) => {
+    const user = await User.findOne({ email });
+    if (!user) {
+        throw new NotFoundError('No user found with that email');
+    }
+    const isValid = await bcrypt.compare(password, user.password);
+    if (!isValid) {
+        throw new UnauthorizedError('Password does not match');
+    }
+    
+    const token = jwt.sign(
+        { id: user._id, role: user.role }, 
+        JWT_SECRET, 
+        { expiresIn: '12h' }
+    );
+    
+    return {
+        token,
+        user: {
+            name: user.name,
+            email: user.email,
+            role: user.role
+        }
+    };
 };
 
 module.exports = {
-    registerUser: registerUser,
-    loginUser: loginUser
+    registerUser,
+    loginUser
 };

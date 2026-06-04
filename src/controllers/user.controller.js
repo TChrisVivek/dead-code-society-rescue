@@ -1,12 +1,14 @@
-var userService = require('../services/user.service');
+const userService = require('../services/user.service');
 
-var getProfile = function(req, res) {
-    userService.getUserProfile(req.userId)
-        .then(function(user) {
-            res.json(user);
-        }); // SMELL: [HIGH] Missing catch block leads to unhandled promise rejection
+const getProfile = async (req, res, next) => {
+    try {
+        const user = await userService.getUserProfile(req.userId);
+        res.json(user);
+    } catch (err) {
+        next(err);
+    }
 };
 
 module.exports = {
-    getProfile: getProfile
+    getProfile
 };
