@@ -1,19 +1,7 @@
 const Shipment = require('../../models/Shipment');
-const User = require('../../models/User');
 
 const getShipments = async (userId) => {
-    const shipments = await Shipment.find({ userId });
-    
-    if (shipments.length === 0) return [];
-    
-    const finalData = [];
-    for (const shipment of shipments) {
-        const ship = shipment.toObject();
-        const u = await User.findById(ship.userId);
-        ship.user_details = u;
-        finalData.push(ship);
-    }
-    return finalData;
+    return await Shipment.find({ userId }).populate('userId', 'name email');
 };
 
 const getShipmentById = async (id) => {
